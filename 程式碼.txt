@@ -1,0 +1,139 @@
+import random
+import antigravity as ag
+
+# 遊戲設定
+GRID_WIDTH = 10
+GRID_HEIGHT = 20
+CELL_SIZE = 30
+
+# 方塊形狀
+SHAPES = [
+    [[1, 1, 1, 1]],  # I
+    [[1, 1], [1, 1]],  # O
+    [[0, 1, 0], [1, 1, 1]],  # T
+    [[1, 1, 0], [0, 1, 1]],  # S
+    [[0, 1, 1], [1, 1, 0]],  # Z
+    [[1, 0, 0], [1, 1, 1]],  # J
+    [[0, 0, 1], [1, 1, 1]],  # L
+]
+
+class Tetromino:
+    def __init__(self):
+        self.shape = random.choice(SHAPES)
+        self.x = GRID_WIDTH // 2 - len(self.shape[0]) // 2
+        self.y = 0
+
+    def rotate(self):
+        self.shape = [list(row) for row in zip(*self.shape[::-1])]
+
+class TetrisGame:
+    def __init__(self):
+        self.grid = [[0]*GRID_WIDTH for _ in range(GRID_HEIGHT)]
+        self.current = Tetromino()
+        self.game_over = False
+
+    def valid_move(self, dx, dy, shape=None):
+        if shape is None:
+            shape = self.current.shape
+
+        for y, row in enumerate(shape):
+            for x, cell in enumerate(row):
+                if cell:
+                    new_x = self.current.x + x + dx
+                    new_y = self.current.y + y + dy
+
+                    if new_x < 0 or new_x >= GRID_WIDTH:
+                        return False
+                    if new_y >= GRID_HEIGHT:
+                        return False
+                    if new_y >= 0 and self.grid[new_y][new_x]:
+                        return False
+        return True
+
+    def freeze(self):
+        for y, row in enumerate(self.current.shape):
+            for x, cell in enumerate(row):
+                if cell:
+                    self.grid[self.current.y + y][self.current.x + x] = 1
+        self.clear_lines()
+        self.current = Tetromino()
+
+        if not self.valid_move(0, 0):
+            self.game_over = True
+
+    def clear_lines(self):
+        new_grid = [row for row in self.grid if any(cell == 0 for cell in row)]
+        lines_cleared = GRID_HEIGHT - len(new_grid)
+        for _ in range(lines_cleared):
+            new_grid.insert(0, [0]*GRID_WIDTH)
+        self.grid = new_grid
+
+    def update(self):
+        if self.valid_move(0, 1):
+            self.current.y += 1
+        else:
+            self.freeze()
+
+    def move(self, dx):
+        if self.valid_move(dx, 0):
+            self.current.x += dx
+
+    def rotate(self):
+        new_shape = [list(row) for row in zip(*self.current.shape[::-1])]
+        if self.valid_move(0, 0, new_shape):
+            self.current.shape = new_shape
+
+    def draw(self, screen):
+        screen.clear()
+
+        # 畫已固定方塊
+        for y in range(GRID_HEIGHT):
+            for x in range(GRID_WIDTH):
+                if self.grid[y][x]:
+                    screen.draw_rect(x*CELL_SIZE, y*CELL_SIZE, CELL_SIZE, CELL_SIZE, color="blue")
+
+        # 畫當前方塊
+        for y, row in enumerate(self.current.shape):
+            for x, cell in enumerate(row):
+                if cell:
+                    screen.draw_rect(
+                        (self.current.x + x)*CELL_SIZE,
+                        (self.current.y + y)*CELL_SIZE,
+                        CELL_SIZE,
+                        CELL_SIZE,
+                        color="red"
+                    )
+
+        screen.update()
+
+
+# 初始化
+game = TetrisGame()
+screen = ag.create_window(GRID_WIDTH * CELL_SIZE, GRID_HEIGHT * CELL_SIZE)
+
+def game_loop():
+    if game.game_over:
+        print("Game Over")
+        ag.quit()
+        return
+
+    game.update()
+    game.draw(screen)
+
+# 鍵盤控制
+def on_key(key):
+    if key == "left":
+        game.move(-1)
+    elif key == "right":
+        game.move(1)
+    elif key == "down":
+        game.update()
+    elif key == "up":
+        game.rotate()
+
+# 註冊事件
+ag.set_interval(game_loop, 500)  # 每 500ms 更新
+ag.on_key_press(on_key)
+
+# 啟動
+ag.run()
